@@ -10,7 +10,6 @@ IOOBJOrientationHelper = type('DummyIOOBJOrientationHelper', (object,), {})
 vertex_color_layer_channels = 4
 
 
-# TODO we don't need any old version compatible, remove these in later version.
 def set_active_object(context, obj):
     context.view_layer.objects.active = obj  # the 2.8 way
 
@@ -39,14 +38,11 @@ def keys_to_strings(d):
     return {str(k): v for k, v in d.items()}
 
 
-# This is used to catch any exception in run time and raise it to blender output console.
+# This used to catch any exception in run time and raise it to blender output console.
 class Fatal(Exception):
     pass
 
 
-'''
-DXGI Formats but why use this unreadable format ?
-'''
 f32_pattern = re.compile(r'''(?:DXGI_FORMAT_)?(?:[RGBAD]32)+_FLOAT''')
 f16_pattern = re.compile(r'''(?:DXGI_FORMAT_)?(?:[RGBAD]16)+_FLOAT''')
 u32_pattern = re.compile(r'''(?:DXGI_FORMAT_)?(?:[RGBAD]32)+_UINT''')
@@ -64,7 +60,6 @@ misc_float_pattern = re.compile(r'''(?:DXGI_FORMAT_)?(?:[RGBAD][0-9]+)+_(?:FLOAT
 misc_int_pattern = re.compile(r'''(?:DXGI_FORMAT_)?(?:[RGBAD][0-9]+)+_[SU]INT''')
 
 
-# TODO strange design and hard to read and understand for mod author, make this easier and more readable later.
 def EncoderDecoder(fmt):
     if f32_pattern.match(fmt):
         return (lambda data: b''.join(struct.pack('<f', x) for x in data),
@@ -109,7 +104,6 @@ def EncoderDecoder(fmt):
     raise Fatal('File uses an unsupported DXGI Format: %s' % fmt)
 
 
-# TODO strange design again ,why don't use a class to wrap all encode and decode??
 components_pattern = re.compile(r'''(?<![0-9])[0-9]+(?![0-9])''')
 
 

@@ -97,8 +97,43 @@ def import_normals_step1(mesh, data):
 def import_normals_step2(mesh):
     # Taken from import_obj/import_fbx
     clnors = array('f', [0.0] * (len(mesh.loops) * 3))
+
+    '''
+    https://docs.blender.org/api/3.6/bpy.types.bpy_prop_collection.html#bpy.types.bpy_prop_collection.foreach_get
+
+    This is a function to give fast access to attributes within a collection.
+
+    Only works for ‘basic type’ properties (bool, int and float)! Multi-dimensional arrays
+    (like array of vectors) will be flattened into seq.
+
+    collection.foreach_get(attr, some_seq)
+
+    # Python equivalent
+    for i in range(len(seq)):
+        some_seq[i] = getattr(collection[i], attr)
+    '''
     mesh.loops.foreach_get("normal", clnors)
+
+    '''
+    https://docs.blender.org/api/3.6/bpy.types.bpy_prop_collection.html#bpy.types.bpy_prop_collection.foreach_set
+
+    This is a function to give fast access to attributes within a collection.
+    Only works for ‘basic type’ properties (bool, int and float)! seq must be uni-dimensional, 
+    multi-dimensional arrays (like array of vectors) will be re-created from it.
+    
+    collection.foreach_set(attr, some_seq)
+
+    # Python equivalent
+    for i in range(len(some_seq)):
+        setattr(collection[i], attr, some_seq[i])
+
+    https://docs.blender.org/api/3.6/bpy.types.Mesh.html#bpy.types.Mesh.polygons
+    https://docs.blender.org/api/3.6/bpy.types.MeshPolygons.html#bpy.types.MeshPolygons
+
+    '''
     mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+
+    # Define custom split normals of this mesh (use zero-vectors to keep auto ones)
     mesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
 
 
@@ -123,10 +158,15 @@ def import_vertex_groups(mesh, obj, blend_indices, blend_weights):
 
 def import_uv_layers(mesh, obj, texcoords, flip_texcoord_v):
     for (texcoord, data) in sorted(texcoords.items()):
-        # TEXCOORDS can have up to four components, but UVs can only have two
-        # dimensions. Not positive of the best way to handle this in general,
-        # but for now I'm thinking that splitting the TEXCOORD into two sets of
-        # UV coordinates might work:
+        '''
+        TODO 这里他说的TEXCOORD可以有四个分量的原因是什么？是不是因为自定义数据写到TEXCOORD里的原因？
+        如果是因为自定义数据，则自定义数据应该由其它模块处理
+
+        TEXCOORDS can have up to four components, but UVs can only have two
+        dimensions. Not positive of the best way to handle this in general,
+        but for now I'm thinking that splitting the TEXCOORD into two sets of
+        UV coordinates might work:
+        '''
         dim = len(data[0])
         if dim == 4:
             components_list = ('xy', 'zw')
@@ -165,58 +205,23 @@ def import_uv_layers(mesh, obj, texcoords, flip_texcoord_v):
             else:
                 flip_uv = lambda uv: uv
 
-            # TODO WTF? why merge them in one line, too hard to understand.
+            # TODO 这种全写在一行里的太难理解了
             uvs = [[d[cmap[c]] for c in components] for d in data]
 
             for l in mesh.loops:
                 blender_uvs.data[l.index].uv = flip_uv(uvs[l.vertex_index])
 
 
-# VertexLayer的设计应该被去除
-# Nico:
-# 在游戏Mod制作中，所有提取的属性和生成的属性都是应该提前规划好的，
-# 而不是在这里做额外的无用步骤来传递一些垃圾属性。
-# This loads unknown data from the vertex buffers as vertex layers
-# def import_vertex_layers(mesh, obj, vertex_layers):
-#     for (element_name, data) in sorted(vertex_layers.items()):
-#         dim = len(data[0])
-#         cmap = {0: 'x', 1: 'y', 2: 'z', 3: 'w'}
-#         for component in range(dim):
-
-#             if dim != 1 or element_name.find('.') == -1:
-#                 layer_name = '%s.%s' % (element_name, cmap[component])
-#             else:
-#                 layer_name = element_name
-
-#             if type(data[0][0]) == int:
-#                 layer = mesh.vertex_layers.new(name=layer_name, type='INT')
-
-#                 for v in mesh.vertices:
-#                     val = data[v.index][component]
-#                     # Blender integer layers are 32bit signed and will throw an
-#                     # exception if we are assigning an unsigned value that
-#                     # can't fit in that range. Reinterpret as signed if necessary:
-#                     if val < 0x80000000:
-#                         layer.data[v.index].value = val
-#                     else:
-#                         layer.data[v.index].value = struct.unpack('i', struct.pack('I', val))[0]
-#             elif type(data[0][0]) == float:
-#                 layer = mesh.vertex_layers.new(name=layer_name, type='FLOAT')
-#                 for v in mesh.vertices:
-#                     layer.data[v.index].value = data[v.index][component]
-#             else:
-#                 raise Fatal('BUG: Bad layer type %s' % type(data[0][0]))
-
-
 def import_faces_from_ib(mesh, ib):
     mesh.loops.add(len(ib.faces) * 3)
     mesh.polygons.add(len(ib.faces))
     mesh.loops.foreach_set('vertex_index', unpack_list(ib.faces))
+    # https://docs.blender.org/api/3.6/bpy.types.MeshPolygon.html#bpy.types.MeshPolygon.loop_start
     mesh.polygons.foreach_set('loop_start', [x * 3 for x in range(len(ib.faces))])
     mesh.polygons.foreach_set('loop_total', [3] * len(ib.faces))
 
 
-# Nico: 这玩意基本上用不到吧，没有IB的情况下要怎么做到自动生成顶点索引呢？这样生成出来真的和游戏里替换所需要的格式一样吗？
+# TODO 这玩意基本上用不到吧，没有IB的情况下要怎么做到自动生成顶点索引呢？这样生成出来真的和游戏里替换所需要的格式一样吗？
 def import_faces_from_vb(mesh, vb):
     # Only lightly tested
     num_faces = len(vb.vertices) // 3
@@ -338,20 +343,18 @@ def create_material_with_texture(obj, mesh_name, directory):
     texture_path = find_texture(texture_prefix, texture_suffix, directory)
 
     # 如果不存在，试试查找jpg文件
-    if texture_path is None:
-        if len(mesh_name_split) > 1:
-            texture_suffix = f"{mesh_name_split[1]}-DiffuseMap.jpg"  # Part Name
-        else:
-            texture_suffix = "-DiffuseMap.jpg"
+    # if texture_path is None:
+    #     if len(mesh_name_split) > 1:
+    #         texture_suffix = f"{mesh_name_split[1]}-DiffuseMap.jpg"  # Part Name
+    #     else:
+    #         texture_suffix = "-DiffuseMap.jpg"
 
-        # 查找jpg文件，如果这里没找到的话后面也是正常的，但是这里如果找到了就能起到兼容旧版本jpg文件的作用
-        texture_path = find_texture(texture_prefix, texture_suffix, directory)
+    #     # 查找jpg文件，如果这里没找到的话后面也是正常的，但是这里如果找到了就能起到兼容旧版本jpg文件的作用
+    #     texture_path = find_texture(texture_prefix, texture_suffix, directory)
 
     # Nico: 这里如果没有检测到对应贴图则不创建材质，也不新建BSDF
     # 否则会造成合并模型后，UV编辑界面选择不同材质的UV会跳到不同UV贴图界面导致无法正常编辑的问题
-    if texture_path is None:
-        pass
-    else:
+    if texture_path is not None:
         # Создание нового материала (Create new materials)
         material = bpy.data.materials.new(name=material_name)
         material.use_nodes = True
@@ -389,7 +392,8 @@ def find_texture(texture_prefix, texture_suffix, directory):
     return None
 
 
-def import_3dmigoto_vb_ib(operator, context, paths, flip_texcoord_v=True, axis_forward='-Z', axis_up='Y'):
+# TODO 为什么要flip_texcoord_v?
+def import_3dmigoto_vb_ib(operator, context,          paths, flip_texcoord_v=True, axis_forward='-Z', axis_up='Y'):
     vb, ib, name = load_3dmigoto_mesh(operator, paths)
 
     mesh = bpy.data.meshes.new(name)
@@ -411,6 +415,7 @@ def import_3dmigoto_vb_ib(operator, context, paths, flip_texcoord_v=True, axis_f
         obj['3DMigoto:IBFormat'] = ib.format
         obj['3DMigoto:FirstIndex'] = ib.first
     else:
+        # TODO 这里用不上，需要移除，但是确保在测试之后移除，还不是特别确定其它领域是否有用，至少游戏Mod里用不上
         import_faces_from_vb(mesh, vb)
 
     (blend_indices, blend_weights, texcoords, vertex_layers, use_normals) = import_vertices(mesh, vb)
@@ -442,7 +447,6 @@ def import_3dmigoto_vb_ib(operator, context, paths, flip_texcoord_v=True, axis_f
     bm = bmesh.new()
     bm.from_mesh(mesh)
     
-
     # 删除松散点 delete loose before get this
     # bm.verts.ensure_lookup_table()
     # for v in bm.verts:
@@ -457,129 +461,11 @@ def import_3dmigoto_vb_ib(operator, context, paths, flip_texcoord_v=True, axis_f
     obj['3DMigoto:OriginalVertexNumber'] = len(mesh.vertices)
     obj['3DMigoto:OriginalIndicesNumber'] = len(mesh.loops)
 
-    # ----------------------------------------------------------------------------------------------------------------------------
-    # Nico: 下面是由rayvy提议的添加贴图自动导入支持，需要大量测试如何以优雅的方式和MMT结合在一起
+    # 自动贴图导入
     mesh_prefix: str = str(mesh.name).split(".")[0]
     # operator.report({'INFO'}, mesh_prefix)
     create_material_with_texture(obj, mesh_prefix, os.path.dirname(paths[0][0][0]))
     return obj
-
-
-@orientation_helper(axis_forward='-Z', axis_up='Y')
-class Import3DMigotoFrameAnalysis(bpy.types.Operator, ImportHelper, IOOBJOrientationHelper):
-    """Import a mesh dumped with 3DMigoto's frame analysis"""
-    bl_idname = "import_mesh.migoto_frame_analysis_mmt"
-    bl_label = "Import 3DMigoto Frame Analysis Dump  (MMT)"
-    bl_options = {'PRESET', 'UNDO'}
-
-    filename_ext = '.txt'
-
-    directory: StringProperty(
-        name="Directory",
-        subtype='DIR_PATH',
-        default= "",
-    ) # type: ignore
-
-    filter_glob: StringProperty(
-        default='*.txt',
-        options={'HIDDEN'},
-    ) # type: ignore
-
-    files: CollectionProperty(
-        name="File Path",
-        type=bpy.types.OperatorFileListElement,
-    ) # type: ignore
-
-    flip_texcoord_v: BoolProperty(
-        name="Flip TEXCOORD V",
-        description="Flip TEXCOORD V asix during importing",
-        default=True,
-    ) # type: ignore
-
-    load_related: BoolProperty(
-        name="Auto-load related meshes",
-        description="Automatically load related meshes found in the frame analysis dump",
-        default=True,
-    ) # type: ignore
-
-    def get_vb_ib_paths(self):
-        buffer_pattern = re.compile(r'''-(?:ib|vb[0-9]+)(?P<hash>=[0-9a-f]+)?(?=[^0-9a-f=])''')
-
-        dirname = os.path.dirname(self.filepath)
-        ret = set()
-
-        files = []
-        if self.load_related:
-            for filename in self.files:
-                match = buffer_pattern.search(filename.name)
-                if match is None or not match.group('hash'):
-                    continue
-                paths = glob(os.path.join(dirname, '*%s*.txt' % filename.name[match.start():match.end()]))
-                files.extend([os.path.basename(x) for x in paths])
-        if not files:
-            files = [x.name for x in self.files]
-
-        for filename in files:
-            match = buffer_pattern.search(filename)
-            if match is None:
-                raise Fatal(
-                    'Unable to find corresponding buffers from filename - ensure you are loading a dump from a timestamped Frame Analysis directory (not a deduped directory)')
-
-            use_bin = False
-            if not match.group('hash') and not use_bin:
-                self.report({'INFO'},
-                            'Filename did not contain hash - if Frame Analysis dumped a custom resource the .txt file may be incomplete, Using .buf files instead')
-                use_bin = True  # FIXME: Ask
-
-            ib_pattern = filename[:match.start()] + '-ib*' + filename[match.end():]
-            vb_pattern = filename[:match.start()] + '-vb*' + filename[match.end():]
-            ib_paths = glob(os.path.join(dirname, ib_pattern))
-            vb_paths = glob(os.path.join(dirname, vb_pattern))
-
-            if vb_paths and use_bin:
-                vb_bin_paths = [os.path.splitext(x)[0] + '.buf' for x in vb_paths]
-                ib_bin_paths = [os.path.splitext(x)[0] + '.buf' for x in ib_paths]
-                if all([os.path.exists(x) for x in itertools.chain(vb_bin_paths, ib_bin_paths)]):
-                    # When loading the binary files, we still need to process
-                    # the .txt files as well, as they indicate the format:
-                    ib_paths = list(zip(ib_bin_paths, ib_paths))
-                    vb_paths = list(zip(vb_bin_paths, vb_paths))
-                else:
-                    self.report({'WARNING'}, 'Corresponding .buf files not found - using .txt files')
-                    use_bin = False
-
-            # if self.pose_cb:
-            #     pose_pattern = filename[:match.start()] + '*-' + self.pose_cb + '=*.txt'
-            #     try:
-            #         pose_path = glob(os.path.join(dirname, pose_pattern))[0]
-            #     except IndexError:
-            #         pass
-
-            if len(ib_paths) != 1 or len(vb_paths) != 1:
-                raise Fatal(
-                    'Only draw calls using a single vertex buffer and a single index buffer are supported for now')
-
-            ret.add((vb_paths[0], ib_paths[0], use_bin))
-        return ret
-
-    def execute(self, context):
-        # if self.load_buf:
-        #     # Is there a way to have the mutual exclusivity reflected in
-        #     # the UI? Grey out options or use radio buttons or whatever?
-        #     if self.merge_meshes or self.load_related:
-        #         self.report({'INFO'}, 'Loading .buf files selected: Disabled incompatible options')
-        #     self.merge_meshes = False
-        #     self.load_related = False
-
-        try:
-            keywords = self.as_keywords(
-                ignore=('filepath', 'files', 'filter_glob', 'load_related', 'load_buf', 'pose_cb','directory'))
-            paths = self.get_vb_ib_paths()
-            self.report({'INFO'}, "test：" + str(paths))
-            import_3dmigoto(self, context, paths, **keywords)
-        except Fatal as e:
-            self.report({'ERROR'}, str(e))
-        return {'FINISHED'}
 
 
 def import_3dmigoto_raw_buffers(operator, context, vb_fmt_path, ib_fmt_path, vb_path=None, ib_path=None, **kwargs):
@@ -587,6 +473,7 @@ def import_3dmigoto_raw_buffers(operator, context, vb_fmt_path, ib_fmt_path, vb_
     return import_3dmigoto(operator, context, paths, **kwargs)
 
 
+# TODO @orientation_helper 这个装饰器的使用需要去除，可参考WWMI的设计
 @orientation_helper(axis_forward='-Z', axis_up='Y')
 class Import3DMigotoRaw(bpy.types.Operator, ImportHelper, IOOBJOrientationHelper):
     """Import raw 3DMigoto vertex and index buffers"""

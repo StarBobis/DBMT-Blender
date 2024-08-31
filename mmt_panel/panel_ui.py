@@ -251,10 +251,6 @@ class MMTPanel(bpy.types.Panel):
         layout.separator()
         layout.label(text="在OutputFolder中导入或导出")
 
-        # 快速导入，点这个之后默认路径为OutputFolder，这样直接就能去导入不用翻很久文件夹找路径了
-        operator_import_txt = self.layout.operator("import_mesh.migoto_frame_analysis_mmt", text="导入 .txt 模型文件")
-        operator_import_txt.directory = output_folder_path
-
         # 新增快速导入buf文件
         operator_import_ib_vb = self.layout.operator("import_mesh.migoto_raw_buffers_mmt", text="导入 .ib & .vb 模型文件")
         operator_import_ib_vb.filepath = output_folder_path
