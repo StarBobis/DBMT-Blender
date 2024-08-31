@@ -115,6 +115,26 @@ def write_fmt_file(f, vb, ib):
     f.write(vb.layout.to_string())
 
 
+class HashableVertex(dict):
+    # 旧的代码注释掉了，不过不删，留着用于参考防止忘记原本的设计
+    # def __hash__(self):
+    #     # Convert keys and values into immutable types that can be hashed
+    #     immutable = tuple((k, tuple(v)) for k, v in sorted(self.items()))
+    #     return hash(immutable)
+
+    def __hash__(self):
+        # 这里将步骤拆分开来，更易于理解
+        immutable_items = []
+        for k, v in self.items():
+            tuple_v = tuple(v)
+            pair = (k, tuple_v)
+            immutable_items.append(pair)
+        sorted_items = sorted(immutable_items)
+        immutable = tuple(sorted_items)
+        return hash(immutable)
+
+
+
 def export_3dmigoto(operator, context, vb_path, ib_path, fmt_path):
 
     operator.report({'INFO'}, "导出是否保持相同顶点数：" + str(bpy.context.scene.mmt_props.export_same_number))

@@ -11,57 +11,6 @@ from bpy.props import BoolProperty, StringProperty, CollectionProperty
 from bpy_extras.io_utils import orientation_helper
 
 
-def load_3dmigoto_mesh_bin(operator, vb_paths, ib_paths):
-    if len(vb_paths) != 1 or len(ib_paths) > 1:
-        raise Fatal('Cannot merge meshes loaded from binary files')
-
-    # Loading from binary files, but still need to use the .txt files as a
-    # reference for the format:
-    vb_bin_path, vb_txt_path = vb_paths[0]
-    ib_bin_path, ib_txt_path = ib_paths[0]
-
-    vb = VertexBuffer(open(vb_txt_path, 'r'), load_vertices=False)
-    vb.parse_vb_bin(open(vb_bin_path, 'rb'))
-
-    ib = None
-    if ib_paths:
-        ib = IndexBuffer(open(ib_txt_path, 'r'), load_indices=False)
-        ib.parse_ib_bin(open(ib_bin_path, 'rb'))
-
-    return vb, ib, os.path.basename(vb_bin_path)
-
-
-def load_3dmigoto_mesh(operator, paths):
-    vb_paths, ib_paths, use_bin = zip(*paths)
-
-    if use_bin[0]:
-        return load_3dmigoto_mesh_bin(operator, vb_paths, ib_paths)
-
-    vb = VertexBuffer(open(vb_paths[0], 'r'))
-    # Merge additional vertex buffers for meshes split over multiple draw calls:
-    for vb_path in vb_paths[1:]:
-        tmp = VertexBuffer(open(vb_path, 'r'))
-        vb.merge(tmp)
-
-    # For quickly testing how importent any unsupported semantics may be:
-    # vb.wipe_semantic_for_testing('POSITION.w', 1.0)
-    # vb.wipe_semantic_for_testing('TEXCOORD.w', 0.0)
-    # vb.wipe_semantic_for_testing('TEXCOORD5', 0)
-    # vb.wipe_semantic_for_testing('BINORMAL')
-    # vb.wipe_semantic_for_testing('TANGENT')
-    # vb.write(open(os.path.join(os.path.dirname(vb_paths[0]), 'TEST.vb'), 'wb'), operator=operator)
-
-    ib = None
-    if ib_paths:
-        ib = IndexBuffer(open(ib_paths[0], 'r'))
-        # Merge additional vertex buffers for meshes split over multiple draw calls:
-        for ib_path in ib_paths[1:]:
-            tmp = IndexBuffer(open(ib_path, 'r'))
-            ib.merge(tmp)
-
-    return vb, ib, os.path.basename(vb_paths[0])
-
-
 def import_normals_step1(mesh, data):
     # Nico:
     # Blender不支持4D normal，而UE4 Normal的的第四个分量一般情况下是1，可以忽略后导入
@@ -221,18 +170,7 @@ def import_faces_from_ib(mesh, ib):
     mesh.polygons.foreach_set('loop_total', [3] * len(ib.faces))
 
 
-# TODO 这玩意基本上用不到吧，没有IB的情况下要怎么做到自动生成顶点索引呢？这样生成出来真的和游戏里替换所需要的格式一样吗？
-def import_faces_from_vb(mesh, vb):
-    # Only lightly tested
-    num_faces = len(vb.vertices) // 3
-    mesh.loops.add(num_faces * 3)
-    mesh.polygons.add(num_faces)
-    mesh.loops.foreach_set('vertex_index', [x for x in range(num_faces * 3)])
-    mesh.polygons.foreach_set('loop_start', [x * 3 for x in range(num_faces)])
-    mesh.polygons.foreach_set('loop_total', [3] * num_faces)
-
-
-def import_vertices(mesh, vb):
+def import_vertices(mesh, vb: VertexBuffer):
     mesh.vertices.add(len(vb.vertices))
 
     seen_offsets = set()
@@ -316,17 +254,6 @@ def import_vertices(mesh, vb):
     return (blend_indices, blend_weights, texcoords, vertex_layers, use_normals)
 
 
-def import_3dmigoto(operator, context, paths, **kwargs):
-    obj = []
-    for p in paths:
-        try:
-            obj.append(import_3dmigoto_vb_ib(operator, context, [p], **kwargs))
-        except Fatal as e:
-            operator.report({'ERROR'}, str(e) + ': ' + str(p[:2]))
-    # FIXME: Group objects together  (Nico:这里他的意思应该是导入后自动放入一个集合里，我们也需要这个功能)
-    return obj
-
-
 def create_material_with_texture(obj, mesh_name, directory):
     # Изменим имя текстуры, чтобы оно точно совпадало с шаблоном (Change the texture name to match the template exactly)
     material_name = f"{mesh_name}_Material"
@@ -340,17 +267,12 @@ def create_material_with_texture(obj, mesh_name, directory):
         texture_suffix = "-DiffuseMap.tga"
 
     # 查找是否存在满足条件的转换好的tga贴图文件
-    texture_path = find_texture(texture_prefix, texture_suffix, directory)
 
-    # 如果不存在，试试查找jpg文件
-    # if texture_path is None:
-    #     if len(mesh_name_split) > 1:
-    #         texture_suffix = f"{mesh_name_split[1]}-DiffuseMap.jpg"  # Part Name
-    #     else:
-    #         texture_suffix = "-DiffuseMap.jpg"
-
-    #     # 查找jpg文件，如果这里没找到的话后面也是正常的，但是这里如果找到了就能起到兼容旧版本jpg文件的作用
-    #     texture_path = find_texture(texture_prefix, texture_suffix, directory)
+    texture_path = None
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(texture_suffix) and file.startswith(texture_prefix):
+                texture_path = os.path.join(root, file)
 
     # Nico: 这里如果没有检测到对应贴图则不创建材质，也不新建BSDF
     # 否则会造成合并模型后，UV编辑界面选择不同材质的UV会跳到不同UV贴图界面导致无法正常编辑的问题
@@ -383,22 +305,36 @@ def create_material_with_texture(obj, mesh_name, directory):
                 obj.data.materials.append(material)
 
 
-def find_texture(texture_prefix, texture_suffix, directory):
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith(texture_suffix) and file.startswith(texture_prefix):
-                texture_path = os.path.join(root, file)
-                return texture_path
-    return None
+
+
+def read_vertexbuffer_indexbuffer(operator, paths):
+    vb_paths, ib_paths, use_bin = zip(*paths)
+    if len(vb_paths) != 1 or len(ib_paths) > 1:
+        raise Fatal('暂不支持从加载的bin文件中融合多个文件')
+
+    vb_bin_path, vb_txt_path = vb_paths[0]
+    ib_bin_path, ib_txt_path = ib_paths[0]
+
+    vb = VertexBuffer(open(vb_txt_path, 'r'), load_vertices=False)
+    vb.parse_vb_bin(open(vb_bin_path, 'rb'))
+
+    ib = IndexBuffer(open(ib_txt_path, 'r'), load_indices=False)
+    ib.parse_ib_bin(open(ib_bin_path, 'rb'))
+
+    return vb, ib, os.path.basename(vb_bin_path)
 
 
 # TODO 为什么要flip_texcoord_v?
-def import_3dmigoto_vb_ib(operator, context,          paths, flip_texcoord_v=True, axis_forward='-Z', axis_up='Y'):
-    vb, ib, name = load_3dmigoto_mesh(operator, paths)
+def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True, axis_forward='-Z', axis_up='Y'):
 
+    # 获取vb和ib抽象出的数据，顺便获取最终导入后的名称为 .vb结尾
+    vb, ib, name = read_vertexbuffer_indexbuffer(operator, paths)
+
+    # 创建mesh和Object对象，用于后续填充
     mesh = bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(mesh.name, mesh)
 
+    # 设置坐标系
     global_matrix = axis_conversion(from_forward=axis_forward, from_up=axis_up).to_4x4()
     obj.matrix_world = global_matrix
 
@@ -407,16 +343,10 @@ def import_3dmigoto_vb_ib(operator, context,          paths, flip_texcoord_v=Tru
     obj['3DMigoto:VBLayout'] = vb.layout.serialise()
     obj['3DMigoto:VBStride'] = vb.layout.stride
     obj['3DMigoto:FirstVertex'] = vb.first
+    obj['3DMigoto:IBFormat'] = ib.format
+    obj['3DMigoto:FirstIndex'] = ib.first
 
-    # 这里我们不像GIMI一样在导入的时候就把Format变成R32_UINT，我们只在导出的时候改变格式
-    if ib is not None:
-        import_faces_from_ib(mesh, ib)
-        # Attach the index buffer layout to the object for later exporting.
-        obj['3DMigoto:IBFormat'] = ib.format
-        obj['3DMigoto:FirstIndex'] = ib.first
-    else:
-        # TODO 这里用不上，需要移除，但是确保在测试之后移除，还不是特别确定其它领域是否有用，至少游戏Mod里用不上
-        import_faces_from_vb(mesh, vb)
+    import_faces_from_ib(mesh, ib)
 
     (blend_indices, blend_weights, texcoords, vertex_layers, use_normals) = import_vertices(mesh, vb)
 
@@ -440,19 +370,12 @@ def import_3dmigoto_vb_ib(operator, context,          paths, flip_texcoord_v=Tru
     obj.select_set(True)
     set_active_object(context, obj)
 
-    operator.report({'INFO'}, "Import Into 3Dmigoto")
+    operator.report({'INFO'}, "导入成功!")
 
     import bmesh
     # 创建 BMesh 副本
     bm = bmesh.new()
     bm.from_mesh(mesh)
-    
-    # 删除松散点 delete loose before get this
-    # bm.verts.ensure_lookup_table()
-    # for v in bm.verts:
-    #     if not v.link_faces:
-    #         bm.verts.remove(v)
-
     # 将 BMesh 更新回原始网格
     bm.to_mesh(mesh)
     bm.free()
@@ -468,7 +391,19 @@ def import_3dmigoto_vb_ib(operator, context,          paths, flip_texcoord_v=Tru
     return obj
 
 
+def import_3dmigoto(operator, context, paths, **kwargs):
+    obj = []
+    for p in paths:
+        try:
+            obj.append(import_3dmigoto_vb_ib_to_obj(operator, context, [p], **kwargs))
+        except Fatal as e:
+            operator.report({'ERROR'}, str(e) + ': ' + str(p[:2]))
+    # FIXME: Group objects together  (Nico:这里他的意思应该是导入后自动放入一个集合里，我们也需要这个功能)
+    return obj
+
+
 def import_3dmigoto_raw_buffers(operator, context, vb_fmt_path, ib_fmt_path, vb_path=None, ib_path=None, **kwargs):
+    # 这里的True好像是use_bin?
     paths = (((vb_path, vb_fmt_path), (ib_path, ib_fmt_path), True),)
     return import_3dmigoto(operator, context, paths, **kwargs)
 
@@ -479,12 +414,11 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper, IOOBJOrientationHelper
     """Import raw 3DMigoto vertex and index buffers"""
     bl_idname = "import_mesh.migoto_raw_buffers_mmt"
     bl_label = "Import 3DMigoto Raw Buffers (MMT)"
-    # bl_options = {'PRESET', 'UNDO'}
     bl_options = {'UNDO'}
 
-    filename_ext = '.vb;.ib'
+    filename_ext = '.vb;.ib;.fmt'
     filter_glob: StringProperty(
-        default='*.vb;*.ib',
+        default='*.vb;*.ib;*.fmt',
         options={'HIDDEN'},
     ) # type: ignore
 
@@ -493,12 +427,15 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper, IOOBJOrientationHelper
         type=bpy.types.OperatorFileListElement,
     ) # type: ignore
 
+    # 这里flip_texcoord_v是因为我们游戏里Dump出来的图片是逆向的，所以这里要flip一下才能对上
+    # 理论上可以去掉，设为总是flip对吗？
     flip_texcoord_v: BoolProperty(
         name="Flip TEXCOORD V",
         description="Flip TEXCOORD V asix during importing",
         default=True,
     ) # type: ignore
 
+    # 判断相关文件是否存在
     def get_vb_ib_paths(self, filename):
         vb_bin_path = os.path.splitext(filename)[0] + '.vb'
         ib_bin_path = os.path.splitext(filename)[0] + '.ib'
@@ -512,11 +449,6 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper, IOOBJOrientationHelper
         return (vb_bin_path, ib_bin_path, fmt_path)
 
     def execute(self, context):
-        # I'm not sure how to find the Import3DMigotoReferenceInputFormat
-        # instance that Blender instantiated to pass the values from one
-        # import dialog to another, but since everything is modal we can
-        # just use globals:
-        global migoto_raw_import_options
         migoto_raw_import_options = self.as_keywords(ignore=('filepath', 'files', 'filter_glob'))
 
         # 我们需要添加到一个新建的集合里，方便后续操作
@@ -535,6 +467,7 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper, IOOBJOrientationHelper
                 done.add(os.path.normcase(vb_path))
 
                 if fmt_path is not None:
+                    # 导入的调用链就从这里开始
                     obj_results = import_3dmigoto_raw_buffers(self, context, fmt_path, fmt_path, vb_path=vb_path, ib_path=ib_path, **migoto_raw_import_options)
                     # 虽然复制之后名字会多个001 002这种，但是不影响正常使用，只要能达到效果就行了
                     for obj in obj_results:
@@ -544,54 +477,8 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper, IOOBJOrientationHelper
                         collection.objects.link(new_object)
                         bpy.data.objects.remove(obj)
                 else:
-                    migoto_raw_import_options['vb_path'] = vb_path
-                    migoto_raw_import_options['ib_path'] = ib_path
-                    bpy.ops.import_mesh.migoto_input_format('INVOKE_DEFAULT')
+                    self.report({'ERROR'}, "未找到.fmt文件，无法导入")
             except Fatal as e:
                 self.report({'ERROR'}, str(e))
-
-
         return {'FINISHED'}
-
-
-# used to import .fmt file.
-class Import3DMigotoReferenceInputFormat(bpy.types.Operator, ImportHelper):
-    bl_idname = "import_mesh.migoto_input_format"
-    bl_label = "Select a .txt file with matching format"
-    bl_options = {'UNDO', 'INTERNAL'}
-
-    filename_ext = '.txt;.fmt'
-    filter_glob: StringProperty(
-        default='*.txt;*.fmt',
-        options={'HIDDEN'},
-    ) # type: ignore
-
-    def get_vb_ib_paths(self):
-        if os.path.splitext(self.filepath)[1].lower() == '.fmt':
-            return (self.filepath, self.filepath)
-
-        buffer_pattern = re.compile(r'''-(?:ib|vb[0-9]+)(?P<hash>=[0-9a-f]+)?(?=[^0-9a-f=])''')
-
-        dirname = os.path.dirname(self.filepath)
-        filename = os.path.basename(self.filepath)
-
-        match = buffer_pattern.search(filename)
-        if match is None:
-            raise Fatal('Reference .txt filename does not look like a 3DMigoto timestamped Frame Analysis Dump')
-        ib_pattern = filename[:match.start()] + '-ib*' + filename[match.end():]
-        vb_pattern = filename[:match.start()] + '-vb*' + filename[match.end():]
-        ib_paths = glob(os.path.join(dirname, ib_pattern))
-        vb_paths = glob(os.path.join(dirname, vb_pattern))
-        if len(ib_paths) < 1 or len(vb_paths) < 1:
-            raise Fatal('Unable to locate reference files for both vertex buffer and index buffer format descriptions')
-        return (vb_paths[0], ib_paths[0])
-
-    def execute(self, context):
-        global migoto_raw_import_options
-
-        try:
-            vb_fmt_path, ib_fmt_path = self.get_vb_ib_paths()
-            import_3dmigoto_raw_buffers(self, context, vb_fmt_path, ib_fmt_path, **migoto_raw_import_options)
-        except Fatal as e:
-            self.report({'ERROR'}, str(e))
-        return {'FINISHED'}
+    

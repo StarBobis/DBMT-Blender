@@ -11,10 +11,10 @@ from .mmt_animation.animation_operator import *
 
 
 bl_info = {
-    "name": "MMT",
-    "description": "MMT-Community's Blender Plugin",
+    "name": "DBMT-Blender-Plugin",
+    "description": "DBMT's Blender Plugin",
     "blender": (3, 6, 0),
-    "version": (1, 0, 5, 8),
+    "version": (1, 0, 0, 1),
     "location": "View3D",
     "warning": "Only support Blender 3.6 LTS",
     "category": "Generic"
@@ -27,10 +27,13 @@ register_classes = (
     MMTPathOperator,
     MMTPanel,
 
-    Import3DMigotoFrameAnalysis,
+    # 3Dmigoto ib和vb格式导入导出
     Import3DMigotoRaw,
-    Import3DMigotoReferenceInputFormat,
     Export3DMigoto,
+
+    # MMT的一键快速导入导出
+    MMTImportAllTextModel,
+    MMTExportAllIBVBModel,
 
     # mesh_operator 右键菜单栏
     RemoveUnusedVertexGroupOperator,
@@ -47,9 +50,7 @@ register_classes = (
     MMTSetAutoSmooth89,
     SplitMeshByCommonVertexGroup,
 
-    # MMT的一键导入导出
-    MMTImportAllTextModel,
-    MMTExportAllIBVBModel,
+
 
     # MMD类型动画Mod支持
     MMDModIniGenerator

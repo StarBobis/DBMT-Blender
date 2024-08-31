@@ -176,25 +176,6 @@ class InputLayout(object):
         return self.elems == other.elems
 
 
-class HashableVertex(dict):
-    # 旧的代码注释掉了，不过不删，留着用于参考防止忘记原本的设计
-    # def __hash__(self):
-    #     # Convert keys and values into immutable types that can be hashed
-    #     immutable = tuple((k, tuple(v)) for k, v in sorted(self.items()))
-    #     return hash(immutable)
-
-    def __hash__(self):
-        # 这里将步骤拆分开来，更易于理解
-        immutable_items = []
-        for k, v in self.items():
-            tuple_v = tuple(v)
-            pair = (k, tuple_v)
-            immutable_items.append(pair)
-        sorted_items = sorted(immutable_items)
-        immutable = tuple(sorted_items)
-        return hash(immutable)
-
-
 class VertexBuffer(object):
     vb_elem_pattern = re.compile(r'''vb\d+\[\d*\]\+\d+ (?P<semantic>[^:]+): (?P<data>.*)$''')
 
@@ -210,6 +191,7 @@ class VertexBuffer(object):
         self.topology = 'trianglelist'
 
         if f is not None:
+            
             self.parse_vb_txt(f, load_vertices)
 
     def parse_vb_txt(self, f, load_vertices):
@@ -229,10 +211,6 @@ class VertexBuffer(object):
                 self.topology = line[10:]
                 if line != 'topology: trianglelist':
                     raise Fatal('"%s" is not yet supported' % line)
-            if line.startswith('vertex-data:'):
-                if not load_vertices:
-                    return
-                self.parse_vertex_data(f)
         assert (len(self.vertices) == self.vertex_count)
 
     def parse_vb_bin(self, f):
@@ -256,22 +234,6 @@ class VertexBuffer(object):
     def append(self, vertex):
         self.vertices.append(vertex)
         self.vertex_count += 1
-
-    def parse_vertex_data(self, f):
-        vertex = {}
-        for line in map(str.strip, f):
-            # print(line)
-            if line.startswith('instance-data:'):
-                break
-
-            match = self.vb_elem_pattern.match(line)
-            if match:
-                vertex[match.group('semantic')] = self.parse_vertex_element(match)
-            elif line == '' and vertex:
-                self.vertices.append(vertex)
-                vertex = {}
-        if vertex:
-            self.vertices.append(vertex)
 
     def parse_vertex_element(self, match):
         fields = match.group('data').split(',')
@@ -318,19 +280,7 @@ class VertexBuffer(object):
 
     def __len__(self):
         return len(self.vertices)
-
-    def merge(self, other):
-        if self.layout != other.layout:
-            raise Fatal(
-                'Vertex buffers have different input layouts - ensure you are only trying to merge the same vertex buffer split across multiple draw calls')
-        if self.first != other.first:
-            # FIXME: Future 3DMigoto might automatically set first from the
-            # index buffer and chop off unreferenced vertices to save space
-            raise Fatal(
-                'Cannot merge multiple vertex buffers - please check for updates of the 3DMigoto import script, or import each buffer separately')
-        self.vertices.extend(other.vertices[self.vertex_count:])
-        self.vertex_count = max(self.vertex_count, other.vertex_count)
-        assert (len(self.vertices) == self.vertex_count)
+        
 
     def wipe_semantic_for_testing(self, semantic, val=0):
         print('WARNING: WIPING %s FOR TESTING PURPOSES!!!' % semantic)
@@ -422,14 +372,6 @@ class IndexBuffer(object):
             assert (len(face) == 3)
             self.faces.append(face)
 
-    def merge(self, other):
-        if self.format != other.format:
-            raise Fatal(
-                'Index buffers have different formats - ensure you are only trying to merge the same index buffer split across multiple draw calls')
-        self.first = min(self.first, other.first)
-        self.index_count += other.index_count
-        self.faces.extend(other.faces)
-
     def write(self, output, operator=None):
         for face in self.faces:
             output.write(self.encoder(face))
@@ -442,4 +384,3 @@ class IndexBuffer(object):
 
     def __len__(self):
         return len(self.faces) * 3
-
