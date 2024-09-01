@@ -221,7 +221,7 @@ class MMTPanel(bpy.types.Panel):
         layout.prop(props, "path")
 
         # 获取MMT.exe的路径
-        mmt_path = os.path.join(context.scene.mmt_props.path, "MMT-GUI.exe")
+        mmt_path = os.path.join(context.scene.mmt_props.path, "DBMT-GUI.exe")
         mmt_location = os.path.dirname(mmt_path)
         if os.path.exists(mmt_path):
             pass
