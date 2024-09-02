@@ -14,7 +14,7 @@ bl_info = {
     "name": "DBMT-Blender-Plugin",
     "description": "DBMT's Blender Plugin",
     "blender": (3, 6, 0),
-    "version": (1, 0, 0, 1),
+    "version": (1, 0, 0, 2),
     "location": "View3D",
     "warning": "Only support Blender 3.6 LTS",
     "category": "Generic"
@@ -32,7 +32,7 @@ register_classes = (
     Export3DMigoto,
 
     # MMT的一键快速导入导出
-    MMTImportAllTextModel,
+    MMTImportAllVbModel,
     MMTExportAllIBVBModel,
 
     # mesh_operator 右键菜单栏

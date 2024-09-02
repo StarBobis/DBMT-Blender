@@ -306,3 +306,64 @@ class Export3DMigoto(bpy.types.Operator, ExportHelper):
         except Fatal as e:
             self.report({'ERROR'}, str(e))
         return {'FINISHED'}
+
+
+class MMTExportAllIBVBModel(bpy.types.Operator):
+    bl_idname = "mmt.export_all"
+    bl_label = "Export all .ib and .vb model to current OutputFolder"
+
+    def execute(self, context):
+        # 首先根据MMT路径，获取
+        mmt_path = bpy.context.scene.mmt_props.path
+        current_game = ""
+        main_setting_path = os.path.join(context.scene.mmt_props.path, "Configs\\Main.json")
+        if os.path.exists(main_setting_path):
+            main_setting_file = open(main_setting_path)
+            main_setting_json = json.load(main_setting_file)
+            main_setting_file.close()
+            current_game = main_setting_json["GameName"]
+
+        output_folder_path = mmt_path + "Games\\" + current_game + "\\3Dmigoto\\Mods\\output\\"
+        # 创建 Export3DMigoto 类的实例对象
+
+
+        # 遍历当前选中列表的所有mesh，根据名称导出到对应的文件夹中
+        # 获取当前选中的对象列表
+        selected_collection = bpy.context.collection
+
+        # 遍历选中的对象
+        export_time = 0
+        for obj in selected_collection.objects:
+            # 判断对象是否为网格对象
+            if obj.type == 'MESH':
+                export_time = export_time + 1
+                bpy.context.view_layer.objects.active = obj
+                mesh = obj.data  # 获取网格数据
+
+                self.report({'INFO'}, "export name: " + mesh.name)
+
+                # 处理当前网格对象
+                # 例如，打印网格名称
+
+                name_splits = str(mesh.name).split("-")
+                draw_ib = name_splits[0]
+                draw_index = name_splits[1]
+                draw_index = draw_index[0:len(draw_index) - 3]
+                if draw_index.endswith(".vb."):
+                    draw_index = draw_index[0:len(draw_index) - 4]
+
+                # 设置类属性的值
+                vb_path = output_folder_path + draw_ib + "\\" + draw_index + ".vb"
+                self.report({'INFO'}, "export path: " + vb_path)
+
+                ib_path = os.path.splitext(vb_path)[0] + '.ib'
+                fmt_path = os.path.splitext(vb_path)[0] + '.fmt'
+
+                # FIXME: ExportHelper will check for overwriting vb_path, but not ib_path
+
+                export_3dmigoto(self, context, vb_path, ib_path, fmt_path)
+        if export_time == 0:
+            self.report({'ERROR'}, "导出失败！请选择一个集合后再点一键导出！")
+        else:
+            self.report({'INFO'}, "一键导出成功！成功导出的部位数量：" + str(export_time))
+        return {'FINISHED'}
