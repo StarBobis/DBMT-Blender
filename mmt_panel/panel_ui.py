@@ -114,19 +114,7 @@ class MMTPanel(bpy.types.Panel):
 
         # # 添加分隔符
         # layout.separator()
-        #
-        # # 将当前动画的每一帧都转换为一个Position.buf然后导出，并生成逐帧ini文件
-        # row = layout.row()
-        # row.label(text="FrameBased Animation Mod")
-        # operator_export_mmd_bone_matrix = row.operator("export_mesh.migoto", text="Export Position Files")
-        # row = layout.row()
-        # row.prop(context.scene, "mmt_mmd_animation_mod_start_frame")
-        # row.prop(context.scene, "mmt_mmd_animation_mod_end_frame")
-        # row.prop(context.scene, "mmt_mmd_animation_mod_play_speed")
-        # # 添加分隔符
-        # layout.separator()
-        #
-        # # 一键快速导入所有位于OutputFolder下的.txt模型
-        # layout.label(text="ShapeKey Mod")
+        # TODO 测试基于Buffer的自动导入导出
+        
 
         

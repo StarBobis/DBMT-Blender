@@ -264,10 +264,14 @@ class BlenderMeshUtils:
 
 
     def apply_normals(obj, mesh, normals):
+        # 选中对象并切换到物体模式
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.mode_set(mode='OBJECT')
+
+        # 判断顶点数匹配
         if len(normals) != len(mesh.vertices):
             raise ValueError("Number of normals must match the number of vertices.")
+        
         mesh.normals_split_custom_set_from_vertices([normal[:3] for normal in normals])
         mesh.update()
         
@@ -405,7 +409,7 @@ def create_mesh_from_buffers(vertices, indices, texcoords, color0, color1, objec
         apply_normals(obj, mesh, normals)
         # Remove loose vertices
         import_shapekeys(obj,shapekey_offsets, shapekey_vertex_ids, shapekey_vertex_offsets)
-        
+
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.delete_loose()
@@ -429,6 +433,7 @@ def main():
     shape_key_vertex_id_file = base_path + '/meshes/ShapeKeyVertexId.buf'
     shape_key_vertex_offset_file = base_path + '/meshes/ShapeKeyVertexOffset.buf'
     ini_file_path = base_path + 'mod.ini'
+
     object_data = extract_drawindexed_values(ini_file_path) # if mod has weird toggles add drawindeces manually
     
     vertices = read_position_buffer(position_buf_path)

@@ -104,6 +104,7 @@ def EncoderDecoder(fmt):
     raise Fatal('File uses an unsupported DXGI Format: %s' % fmt)
 
 
+# 这里是用于判断数据与标准数据长度差距的
 components_pattern = re.compile(r'''(?<![0-9])[0-9]+(?![0-9])''')
 
 

@@ -12,81 +12,6 @@ from bpy.props import BoolProperty, StringProperty, CollectionProperty
 from bpy_extras.io_utils import orientation_helper
 
 
-def import_normals_step1(mesh, data):
-    # Nico:
-    # Blender不支持4D normal，而UE4 Normal的的第四个分量一般情况下是1，可以忽略后导入
-    # 而BINORMAL第四个分量不是1就是-1，这时第四个分量代表手性信息，需要根据是否为-1进行向量翻转。
-    # 不过暂时没有发现BINORMAL，现代引擎一般都用不上BINORMAL了，所以我们这里不再考虑兼容
-    # 这里直接忽略第四个值，无需多余判断，如果真有游戏是4D的Position那到时候再研究
-    # if len(data[0]) == 4:
-        # if [x[3] for x in data] != [0.0] * len(data):
-        #     raise Fatal('Normals are 4D')
-    normals = [(x[0], x[1], x[2]) for x in data]
-
-    # To make sure the normals don't get lost by Blender's edit mode,
-    # or mesh.update() we need to set custom normals in the loops, not
-    # vertices.
-    #
-    # For testing, to make sure our normals are preserved let's use
-    # garbage ones:
-    # import random
-    # normals = [(random.random() * 2 - 1,random.random() * 2 - 1,random.random() * 2 - 1) for x in normals]
-    #
-    # Comment from other import scripts:
-    # Note: we store 'temp' normals in loops, since validate() may alter final mesh,
-    #       we can only set custom lnors *after* calling it.
-
-    # TODO This can't use in BlenderV4.1  see:
-    # https://developer.blender.org/docs/release_notes/4.1/python_api/#mesh
-    mesh.create_normals_split()
-    for l in mesh.loops:
-        # TODO mesh loop.normal is read only in 4.1!
-        l.normal[:] = normals[l.vertex_index]
-
-
-def import_normals_step2(mesh):
-    # Taken from import_obj/import_fbx
-    clnors = array('f', [0.0] * (len(mesh.loops) * 3))
-
-    '''
-    https://docs.blender.org/api/3.6/bpy.types.bpy_prop_collection.html#bpy.types.bpy_prop_collection.foreach_get
-
-    This is a function to give fast access to attributes within a collection.
-
-    Only works for ‘basic type’ properties (bool, int and float)! Multi-dimensional arrays
-    (like array of vectors) will be flattened into seq.
-
-    collection.foreach_get(attr, some_seq)
-
-    # Python equivalent
-    for i in range(len(seq)):
-        some_seq[i] = getattr(collection[i], attr)
-    '''
-    mesh.loops.foreach_get("normal", clnors)
-
-    '''
-    https://docs.blender.org/api/3.6/bpy.types.bpy_prop_collection.html#bpy.types.bpy_prop_collection.foreach_set
-
-    This is a function to give fast access to attributes within a collection.
-    Only works for ‘basic type’ properties (bool, int and float)! seq must be uni-dimensional, 
-    multi-dimensional arrays (like array of vectors) will be re-created from it.
-    
-    collection.foreach_set(attr, some_seq)
-
-    # Python equivalent
-    for i in range(len(some_seq)):
-        setattr(collection[i], attr, some_seq[i])
-
-    https://docs.blender.org/api/3.6/bpy.types.Mesh.html#bpy.types.Mesh.polygons
-    https://docs.blender.org/api/3.6/bpy.types.MeshPolygons.html#bpy.types.MeshPolygons
-
-    '''
-    mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
-
-    # Define custom split normals of this mesh (use zero-vectors to keep auto ones)
-    mesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
-
-
 def import_vertex_groups(mesh, obj, blend_indices, blend_weights):
     assert (len(blend_indices) == len(blend_weights))
     if blend_indices:
@@ -133,18 +58,6 @@ def import_uv_layers(mesh, obj, texcoords, flip_texcoord_v):
             else:  # 2.80
                 mesh.uv_layers.new(name=uv_name)
             blender_uvs = mesh.uv_layers[uv_name]
-
-            # This will assign a texture to the UV layer, which works fine but
-            # working out which texture maps to which UV layer is guesswork
-            # before the import and the artist may as well just assign it
-            # themselves in the UV editor pane when they can see the unwrapped
-            # mesh to compare it with the dumped textures:
-            #
-            # path = textures.get(uv_layer, None)
-            # if path is not None:
-            #    image = load_image(path)
-            #    for i in range(len(mesh.polygons)):
-            #        mesh.uv_textures[uv_layer].data[i].image = image
 
             # Can't find an easy way to flip the display of V in Blender, so
             # add an option to flip it on import & export:
@@ -234,7 +147,10 @@ def import_vertices(mesh, vb: VertexBuffer):
                     alpha_layer[l.index].color = [data[l.vertex_index][3], 0, 0]
         elif elem.name == 'NORMAL':
             use_normals = True
-            import_normals_step1(mesh, data)
+            normals = [(x[0], x[1], x[2]) for x in data]
+            mesh.create_normals_split()
+            for l in mesh.loops:
+                l.normal[:] = normals[l.vertex_index]
         elif elem.name in ('TANGENT', 'BINORMAL'):
             #    # XXX: loops.tangent is read only. Not positive how to handle
             #    # this, or if we should just calculate it when re-exporting.
@@ -254,6 +170,13 @@ def import_vertices(mesh, vb: VertexBuffer):
 
     return (blend_indices, blend_weights, texcoords, vertex_layers, use_normals)
 
+def find_texture(texture_prefix, texture_suffix, directory):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(texture_suffix) and file.startswith(texture_prefix):
+                texture_path = os.path.join(root, file)
+                return texture_path
+    return None
 
 def create_material_with_texture(obj, mesh_name, directory):
     # Изменим имя текстуры, чтобы оно точно совпадало с шаблоном (Change the texture name to match the template exactly)
@@ -270,10 +193,28 @@ def create_material_with_texture(obj, mesh_name, directory):
     # 查找是否存在满足条件的转换好的tga贴图文件
 
     texture_path = None
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith(texture_suffix) and file.startswith(texture_prefix):
-                texture_path = os.path.join(root, file)
+
+    # 查找是否存在满足条件的转换好的tga贴图文件
+    texture_path = find_texture(texture_prefix, texture_suffix, directory)
+
+    # 如果不存在，试试查找jpg文件
+    if texture_path is None:
+        if len(mesh_name_split) > 1:
+            texture_suffix = f"{mesh_name_split[1]}-DiffuseMap.jpg"  # Part Name
+        else:
+            texture_suffix = "-DiffuseMap.jpg"
+        # 查找jpg文件，如果这里没找到的话后面也是正常的，但是这里如果找到了就能起到兼容旧版本jpg文件的作用
+        texture_path = find_texture(texture_prefix, texture_suffix, directory)
+
+    # 如果还不存在，试试查找png文件
+    if texture_path is None:
+        if len(mesh_name_split) > 1:
+            texture_suffix = f"{mesh_name_split[1]}-DiffuseMap.png"  # Part Name
+        else:
+            texture_suffix = "-DiffuseMap.png"
+        # 查找jpg文件，如果这里没找到的话后面也是正常的，但是这里如果找到了就能起到兼容旧版本jpg文件的作用
+        texture_path = find_texture(texture_prefix, texture_suffix, directory)
+
 
     # Nico: 这里如果没有检测到对应贴图则不创建材质，也不新建BSDF
     # 否则会造成合并模型后，UV编辑界面选择不同材质的UV会跳到不同UV贴图界面导致无法正常编辑的问题
@@ -363,7 +304,11 @@ def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True,
 
     # Must be done after validate step:
     if use_normals:
-        import_normals_step2(mesh)
+        # Taken from import_obj/import_fbx
+        clnors = array('f', [0.0] * (len(mesh.loops) * 3))
+        mesh.loops.foreach_get("normal", clnors)
+        mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+        mesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
     else:
         mesh.calc_normals()
 
@@ -373,6 +318,7 @@ def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True,
 
     operator.report({'INFO'}, "导入成功!")
 
+    # TODO 这里用到bmesh的部分删了也没事，到底有什么用呢？
     import bmesh
     # 创建 BMesh 副本
     bm = bmesh.new()
