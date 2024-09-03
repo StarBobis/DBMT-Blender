@@ -247,6 +247,9 @@ def convert_to_fragment(self, context):
     # 切换回对象模式
     bpy.ops.object.mode_set(mode='OBJECT')
 
+    # 更新网格数据
+    mesh_obj.data.update()
+
     return {'FINISHED'}
 
 

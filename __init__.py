@@ -12,11 +12,10 @@ from .mmt_animation.animation_operator import *
 
 bl_info = {
     "name": "DBMT-Blender-Plugin",
-    "description": "DBMT's Blender Plugin",
+    "description": "DBMT's Blender 3.6LTS Plugin",
     "blender": (3, 6, 0),
-    "version": (1, 0, 0, 2),
+    "version": (1, 0, 0, 3),
     "location": "View3D",
-    "warning": "Only support Blender 3.6 LTS",
     "category": "Generic"
 }
 

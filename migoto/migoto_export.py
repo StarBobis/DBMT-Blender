@@ -23,7 +23,6 @@ def blender_vertex_to_3dmigoto_vertex(mesh, obj, blender_loop_vertex, layout, te
     # 根据循环顶点中的顶点索引来从总的顶点中获取对应的顶点
     blender_vertex = mesh.vertices[blender_loop_vertex.vertex_index]
     vertex = {}
-    seen_offsets = set()
 
     # TODO: Warn if vertex is in too many vertex groups for this layout,
     # ignoring groups with weight=0.0
@@ -33,12 +32,6 @@ def blender_vertex_to_3dmigoto_vertex(mesh, obj, blender_loop_vertex, layout, te
         # 只处理per-vertex的
         if elem.InputSlotClass != 'per-vertex':
             continue
-
-        # 用于跳过在同一个顶点上重复元素的处理，这个代码真的会被执行到吗？看起来永远不会触发。
-        if (elem.InputSlot, elem.AlignedByteOffset) in seen_offsets:
-            continue
-        seen_offsets.add((elem.InputSlot, elem.AlignedByteOffset))
-
         if elem.name == 'POSITION':
             vertex[elem.name] = elem.pad(list(blender_vertex.undeformed_co), 1.0)
         elif elem.name.startswith('COLOR'):

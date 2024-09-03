@@ -86,8 +86,6 @@ def import_faces_from_ib(mesh, ib):
 
 def import_vertices(mesh, vb: VertexBuffer):
     mesh.vertices.add(len(vb.vertices))
-
-    seen_offsets = set()
     blend_indices = {}
     blend_weights = {}
     texcoords = {}
@@ -97,13 +95,6 @@ def import_vertices(mesh, vb: VertexBuffer):
     for elem in vb.layout:
         if elem.InputSlotClass != 'per-vertex':
             continue
-
-        # Discard elements that reuse offsets in the vertex buffer, e.g. COLOR
-        # and some TEXCOORDs may be aliases of POSITION:
-        if (elem.InputSlot, elem.AlignedByteOffset) in seen_offsets:
-            assert (elem.name != 'POSITION')
-            continue
-        seen_offsets.add((elem.InputSlot, elem.AlignedByteOffset))
 
         data = tuple(x[elem.name] for x in vb.vertices)
         if elem.name == 'POSITION':

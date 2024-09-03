@@ -52,7 +52,7 @@ class Import_DBMT_Buffer(bpy.types.Operator, ImportHelper):
             new_object.data = obj.data.copy()
             collection.objects.link(new_object)
             bpy.data.objects.remove(obj)
-
+            
 
             # collection.objects.link(obj)
 

@@ -9,10 +9,8 @@ class InputLayoutElement(object):
     SemanticName = ""
     SemanticIndex = ""
     Format = ""
-    InputSlot = ""
     AlignedByteOffset = ""
     InputSlotClass = ""
-    InstanceDataStepRate = ""
 
     def __init__(self, arg):
         if isinstance(arg, io.IOBase):
@@ -26,18 +24,17 @@ class InputLayoutElement(object):
         self.SemanticName = self.next_validate(f, 'SemanticName')
         self.SemanticIndex = int(self.next_validate(f, 'SemanticIndex'))
         self.Format = self.next_validate(f, 'Format')
-        self.InputSlot = int(self.next_validate(f, 'InputSlot'))
         self.AlignedByteOffset = self.next_validate(f, 'AlignedByteOffset')
         if self.AlignedByteOffset == 'append':
             raise Fatal('Input layouts using "AlignedByteOffset=append" are not yet supported')
         self.AlignedByteOffset = int(self.AlignedByteOffset)
         self.InputSlotClass = self.next_validate(f, 'InputSlotClass')
-        self.InstanceDataStepRate = int(self.next_validate(f, 'InstanceDataStepRate'))
+
 
     def to_dict(self):
         d = {'SemanticName': self.SemanticName, 'SemanticIndex': self.SemanticIndex, 'Format': self.Format,
-             'InputSlot': self.InputSlot, 'AlignedByteOffset': self.AlignedByteOffset,
-             'InputSlotClass': self.InputSlotClass, 'InstanceDataStepRate': self.InstanceDataStepRate}
+             'AlignedByteOffset': self.AlignedByteOffset,
+             'InputSlotClass': self.InputSlotClass}
         return d
 
     def to_string(self, indent=2):
@@ -45,28 +42,23 @@ class InputLayoutElement(object):
             SemanticName: %s
             SemanticIndex: %i
             Format: %s
-            InputSlot: %i
             AlignedByteOffset: %i
             InputSlotClass: %s
-            InstanceDataStepRate: %i
         ''').lstrip() % (
             self.SemanticName,
             self.SemanticIndex,
             self.Format,
-            self.InputSlot,
             self.AlignedByteOffset,
             self.InputSlotClass,
-            self.InstanceDataStepRate,
         ), ' ' * indent)
 
     def from_dict(self, d):
         self.SemanticName = d['SemanticName']
         self.SemanticIndex = d['SemanticIndex']
         self.Format = d['Format']
-        self.InputSlot = d['InputSlot']
         self.AlignedByteOffset = d['AlignedByteOffset']
         self.InputSlotClass = d['InputSlotClass']
-        self.InstanceDataStepRate = d['InstanceDataStepRate']
+
 
     @staticmethod
     def next_validate(f, field):
@@ -118,10 +110,8 @@ class InputLayoutElement(object):
                 self.SemanticName == other.SemanticName and \
                 self.SemanticIndex == other.SemanticIndex and \
                 self.Format == other.Format and \
-                self.InputSlot == other.InputSlot and \
                 self.AlignedByteOffset == other.AlignedByteOffset and \
-                self.InputSlotClass == other.InputSlotClass and \
-                self.InstanceDataStepRate == other.InstanceDataStepRate
+                self.InputSlotClass == other.InputSlotClass and 
 
 
 class InputLayout(object):
