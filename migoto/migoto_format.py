@@ -24,12 +24,13 @@ class InputLayoutElement(object):
         self.SemanticName = self.next_validate(f, 'SemanticName')
         self.SemanticIndex = int(self.next_validate(f, 'SemanticIndex'))
         self.Format = self.next_validate(f, 'Format')
+        self.next_validate(f, 'InputSlot') # 仅用于兼容,无效值
         self.AlignedByteOffset = self.next_validate(f, 'AlignedByteOffset')
         if self.AlignedByteOffset == 'append':
             raise Fatal('Input layouts using "AlignedByteOffset=append" are not yet supported')
         self.AlignedByteOffset = int(self.AlignedByteOffset)
         self.InputSlotClass = self.next_validate(f, 'InputSlotClass')
-
+        self.next_validate(f, 'InstanceDataStepRate') # 仅用于兼容,无效值
 
     def to_dict(self):
         d = {'SemanticName': self.SemanticName, 'SemanticIndex': self.SemanticIndex, 'Format': self.Format,
@@ -111,7 +112,7 @@ class InputLayoutElement(object):
                 self.SemanticIndex == other.SemanticIndex and \
                 self.Format == other.Format and \
                 self.AlignedByteOffset == other.AlignedByteOffset and \
-                self.InputSlotClass == other.InputSlotClass and 
+                self.InputSlotClass == other.InputSlotClass 
 
 
 class InputLayout(object):
