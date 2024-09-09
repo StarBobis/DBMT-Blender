@@ -20,6 +20,12 @@ class InputLayoutElement(object):
 
         self.encoder, self.decoder = EncoderDecoder(self.Format)
 
+    @staticmethod
+    def next_validate(f, field):
+        line = next(f).strip()
+        assert (line.startswith(field + ': '))
+        return line[len(field) + 2:]
+    
     def from_file(self, f):
         self.SemanticName = self.next_validate(f, 'SemanticName')
         self.SemanticIndex = int(self.next_validate(f, 'SemanticIndex'))
@@ -60,13 +66,6 @@ class InputLayoutElement(object):
         self.AlignedByteOffset = d['AlignedByteOffset']
         self.InputSlotClass = d['InputSlotClass']
 
-
-    @staticmethod
-    def next_validate(f, field):
-        line = next(f).strip()
-        assert (line.startswith(field + ': '))
-        return line[len(field) + 2:]
-
     @property
     def name(self):
         if self.SemanticIndex:
@@ -74,18 +73,9 @@ class InputLayoutElement(object):
         return self.SemanticName
 
     def pad(self, data, val):
-
         padding = format_components(self.Format) - len(data)
         assert (padding >= 0)
         return data + [val] * padding
-
-        # 这里SinsOfSeven做了改进：https://github.com/DarkStarSword/3d-fixes/issues/32
-        # 但是3.6.8LTS测试无法使用
-        # padding = self.format_len - len(data)
-        # assert (padding >= 0)
-        # data.extend([val] * padding)
-        # return data
-
 
     def clip(self, data):
         return data[:format_components(self.Format)]
@@ -182,7 +172,6 @@ class VertexBuffer(object):
         self.topology = 'trianglelist'
 
         if f is not None:
-            
             self.parse_vb_txt(f, load_vertices)
 
     def parse_vb_txt(self, f, load_vertices):
@@ -253,12 +242,6 @@ class VertexBuffer(object):
                     vertex[semantic] = vertex['~' + semantic]
                     del vertex['~' + semantic]
 
-    def disable_blendweights(self):
-        for vertex in self.vertices:
-            for semantic in list(vertex):
-                if semantic.startswith('BLENDINDICES'):
-                    vertex[semantic] = (0, 0, 0, 0)
-
     def write(self, output, operator=None):
         for vertex in self.vertices:
             output.write(self.layout.encode(vertex))
@@ -272,23 +255,6 @@ class VertexBuffer(object):
     def __len__(self):
         return len(self.vertices)
         
-
-    def wipe_semantic_for_testing(self, semantic, val=0):
-        print('WARNING: WIPING %s FOR TESTING PURPOSES!!!' % semantic)
-        semantic, _, components = semantic.partition('.')
-        if components:
-            components = [{'x': 0, 'y': 1, 'z': 2, 'w': 3}[c] for c in components]
-        else:
-            components = range(4)
-        for vertex in self.vertices:
-            for s in list(vertex):
-                if s == semantic:
-                    v = list(vertex[semantic])
-                    for component in components:
-                        if component < len(v):
-                            v[component] = val
-                    vertex[semantic] = v
-
 
 class IndexBuffer(object):
     def __init__(self, *args, load_indices=True):

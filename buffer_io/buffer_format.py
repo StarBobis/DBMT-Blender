@@ -45,7 +45,6 @@ TODO 在重构完成MMT的导入导出后，删掉上面那一大段话。
 '''
 
 
-
 import math
 import bpy
 import struct
@@ -54,13 +53,37 @@ import re
 import bmesh
 
 
-
 # This used to catch any exception in run time and raise it to blender output console.
 class Fatal(Exception):
     pass
 
 
-class CategoryBufferReader:
+def normalize_weights(weights):
+    normalized_weights = []
+    for weight_set in weights:
+        total_weight = sum(weight_set)
+        if total_weight > 0:
+            normalized_weights.append(tuple(w / total_weight for w in weight_set))
+        else:
+            normalized_weights.append(weight_set)  # Avoid division by zero
+    return normalized_weights
+    
+
+'''
+BufferReader类是一个功能类方法。
+所有方法都是@staticmethod装饰的，便于直接通过类名调用。
+用于读取指定类型的Buffer文件并返回读取到的数据。
+'''
+class BufferReader:
+    @staticmethod
+    def read_index_buffer(file_path:str,stride:int):
+        indices = []
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(stride):  # Assuming indices are packed as 4 bytes each
+                index = struct.unpack('<I', chunk)[0]
+                indices.append(index)
+        return indices
+        
     # ------------------------------------------------------------------------------------------------------------------------
     def read_position_buffer(file_path:str,byte_width:int) -> list:
         # DXGI_FORMAT_R32G32B32_FLOAT uses 12 bytes per vertex
@@ -87,13 +110,8 @@ class CategoryBufferReader:
                     normals.append((nx / 127.0, ny / 127.0, nz / 127.0, nw / 127.0))
         return tangents, normals
 
-    def read_index_buffer(file_path):
-        indices = []
-        with open(file_path, 'rb') as f:
-            while chunk := f.read(4):  # Assuming indices are packed as 4 bytes each
-                index = struct.unpack('<I', chunk)[0]
-                indices.append(index)
-        return indices
+
+
 
     def read_texcoord_buffer(file_path):
         texcoords0 = []
@@ -125,6 +143,8 @@ class CategoryBufferReader:
         return color0
 
 
+
+
     def read_blend_buffer(file_path):
         blend_indices = []
         blend_weights = []
@@ -139,15 +159,6 @@ class CategoryBufferReader:
         return blend_indices, blend_weights
 
 
-    def normalize_weights(weights):
-        normalized_weights = []
-        for weight_set in weights:
-            total_weight = sum(weight_set)
-            if total_weight > 0:
-                normalized_weights.append(tuple(w / total_weight for w in weight_set))
-            else:
-                normalized_weights.append(weight_set)  # Avoid division by zero
-        return normalized_weights
 
 
     def read_shape_key_offset(file_path):
@@ -197,7 +208,7 @@ class CategoryBufferReader:
         return cleaned_offsets
 
 
-class BlenderMeshUtils:
+class MeshImportUtils:
     def import_uv_layers(mesh, texcoords):
         uv_layers_data = [
             ("TEXCOORD.xy", texcoords[0]),  # TexCoord0
@@ -388,11 +399,15 @@ def create_mesh_from_buffers(vertices, indices, texcoords, color0, color1, objec
             color_layer0 = mesh.vertex_colors.new(name="COLOR")
             for poly in mesh.polygons:
                 for loop_index in poly.loop_indices:
+                    # 从mesh.loops里得到loop对象
                     loop = mesh.loops[loop_index]
+                    # 再得到loop的vertex_index对象
                     loop_vertex_index = loop.vertex_index
                     if loop_vertex_index < len(color0):
+                        # 设置对应的COLOR值
                         color_layer0.data[loop_index].color = color0[loop_vertex_index]
 
+        # 下面这个和上面这个完全一样。
         if color1:
             color_layer1 = mesh.vertex_colors.new(name="COLOR1")
             for poly in mesh.polygons:
@@ -402,13 +417,14 @@ def create_mesh_from_buffers(vertices, indices, texcoords, color0, color1, objec
                     if loop_vertex_index < len(color1):
                         color_layer1.data[loop_index].color = color1[loop_vertex_index]
 
-        import_uv_layers(mesh, texcoords)
-        if blend_weights and blend_indices:
-            import_vertex_groups(mesh, obj, blend_indices, blend_weights, component)
-        apply_tangents(mesh, tangents)
-        apply_normals(obj, mesh, normals)
-        # Remove loose vertices
-        import_shapekeys(obj,shapekey_offsets, shapekey_vertex_ids, shapekey_vertex_offsets)
+        # 这里注释掉是因为我改了一下之后报错，记得解开注释哦
+        # import_uv_layers(mesh, texcoords)
+        # if blend_weights and blend_indices:
+        #     import_vertex_groups(mesh, obj, blend_indices, blend_weights, component)
+        # apply_tangents(mesh, tangents)
+        # apply_normals(obj, mesh, normals)
+        # # Remove loose vertices
+        # import_shapekeys(obj,shapekey_offsets, shapekey_vertex_ids, shapekey_vertex_offsets)
 
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.mode_set(mode='EDIT')
@@ -420,36 +436,36 @@ def create_mesh_from_buffers(vertices, indices, texcoords, color0, color1, objec
         print(f"Mesh {i} created successfully.")
 
 
-def main():
-    # Paths to the .buf files
-    base_path = 'F:/WuwaMods/Mods/changlimod/'
-    position_buf_path = base_path + '/meshes/Position.buf'
-    index_buf_path = base_path + '/meshes/index.buf'
-    texcoord_buf_path = base_path + '/meshes/Texcoord.buf'
-    color_buf_path = base_path + '/meshes/color.buf'
-    blend_buf_path = base_path + '/meshes/blend.buf'
-    vector_buf_path = base_path + '/meshes/Vector.buf'
-    shape_key_offset_file = base_path + '/meshes/ShapeKeyOffset.buf'
-    shape_key_vertex_id_file = base_path + '/meshes/ShapeKeyVertexId.buf'
-    shape_key_vertex_offset_file = base_path + '/meshes/ShapeKeyVertexOffset.buf'
-    ini_file_path = base_path + 'mod.ini'
+# def main():
+#     # Paths to the .buf files
+#     base_path = 'F:/WuwaMods/Mods/changlimod/'
+#     position_buf_path = base_path + '/meshes/Position.buf'
+#     index_buf_path = base_path + '/meshes/index.buf'
+#     texcoord_buf_path = base_path + '/meshes/Texcoord.buf'
+#     color_buf_path = base_path + '/meshes/color.buf'
+#     blend_buf_path = base_path + '/meshes/blend.buf'
+#     vector_buf_path = base_path + '/meshes/Vector.buf'
+#     shape_key_offset_file = base_path + '/meshes/ShapeKeyOffset.buf'
+#     shape_key_vertex_id_file = base_path + '/meshes/ShapeKeyVertexId.buf'
+#     shape_key_vertex_offset_file = base_path + '/meshes/ShapeKeyVertexOffset.buf'
+#     ini_file_path = base_path + 'mod.ini'
 
-    object_data = extract_drawindexed_values(ini_file_path) # if mod has weird toggles add drawindeces manually
+#     object_data = extract_drawindexed_values(ini_file_path) # if mod has weird toggles add drawindeces manually
     
-    vertices = read_position_buffer(position_buf_path)
-    indices = read_index_buffer(index_buf_path)
-    texcoords0, texcoords1, texcoords2, color1 = read_texcoord_buffer(texcoord_buf_path)
-    color0 = read_color_buffer(color_buf_path)
-    blend_indices, blend_weights = read_blend_buffer(blend_buf_path)
-    tangents, normals = read_vector_buffer(vector_buf_path)    
-    texcoords = [texcoords0, texcoords1, texcoords2]
-    shapekey_offsets = read_shape_key_offset(shape_key_offset_file)
-    shapekey_vertex_ids = read_shape_key_vertex_id(shape_key_vertex_id_file)
-    shapekey_vertex_offsets = read_shape_key_vertex_offset(shape_key_vertex_offset_file)
+#     vertices = read_position_buffer(position_buf_path)
+#     indices = read_index_buffer(index_buf_path)
+#     texcoords0, texcoords1, texcoords2, color1 = read_texcoord_buffer(texcoord_buf_path)
+#     color0 = read_color_buffer(color_buf_path)
+#     blend_indices, blend_weights = read_blend_buffer(blend_buf_path)
+#     tangents, normals = read_vector_buffer(vector_buf_path)    
+#     texcoords = [texcoords0, texcoords1, texcoords2]
+#     shapekey_offsets = read_shape_key_offset(shape_key_offset_file)
+#     shapekey_vertex_ids = read_shape_key_vertex_id(shape_key_vertex_id_file)
+#     shapekey_vertex_offsets = read_shape_key_vertex_offset(shape_key_vertex_offset_file)
     
-    create_mesh_from_buffers(vertices, indices, texcoords, color0, color1, object_data, blend_weights, blend_indices, normals, tangents, shapekey_offsets, shapekey_vertex_ids, shapekey_vertex_offsets)
+#     create_mesh_from_buffers(vertices, indices, texcoords, color0, color1, object_data, blend_weights, blend_indices, normals, tangents, shapekey_offsets, shapekey_vertex_ids, shapekey_vertex_offsets)
 
-# Call the main function
-main()
+# # Call the main function
+# main()
 
 

@@ -9,6 +9,9 @@ from .mmt_panel.panel_ui import *
 from .mmt_rightclick_menu.mesh_operator import *
 from .mmt_animation.animation_operator import *
 
+# 基于Buffer的全新格式
+from .buffer_io.buffer_import import *
+
 
 bl_info = {
     "name": "DBMT-Blender-Plugin",
@@ -30,6 +33,9 @@ register_classes = (
     Import3DMigotoRaw,
     Export3DMigoto,
 
+    # 新的Buffer格式导入导出
+    Import_DBMT_Buffer,
+
     # MMT的一键快速导入导出
     MMTImportAllVbModel,
     MMTExportAllIBVBModel,
@@ -49,8 +55,6 @@ register_classes = (
     MMTSetAutoSmooth89,
     SplitMeshByCommonVertexGroup,
 
-
-
     # MMD类型动画Mod支持
     MMDModIniGenerator
 )
@@ -63,7 +67,8 @@ def register():
 
     # 新建一个属性用来专门装MMT的路径
     bpy.types.Scene.mmt_props = bpy.props.PointerProperty(type=MMTPathProperties)
-    # mesh_operator
+
+    # 右键菜单
     bpy.types.VIEW3D_MT_object_context_menu.append(menu_func_migoto_right_click)
 
     # 在Blender退出前保存选择的MMT的路径

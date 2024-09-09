@@ -286,15 +286,11 @@ class Export3DMigoto(bpy.types.Operator, ExportHelper):
         default="",
     ) # type: ignore
 
-    # where you do export logic
     def execute(self, context):
         try:
             vb_path = self.filepath
             ib_path = os.path.splitext(vb_path)[0] + '.ib'
             fmt_path = os.path.splitext(vb_path)[0] + '.fmt'
-
-            # FIXME: ExportHelper will check for overwriting vb_path, but not ib_path
-
             export_3dmigoto(self, context, vb_path, ib_path, fmt_path)
         except Fatal as e:
             self.report({'ERROR'}, str(e))
@@ -317,9 +313,6 @@ class MMTExportAllIBVBModel(bpy.types.Operator):
             current_game = main_setting_json["GameName"]
 
         output_folder_path = mmt_path + "Games\\" + current_game + "\\3Dmigoto\\Mods\\output\\"
-        # 创建 Export3DMigoto 类的实例对象
-
-
         # 遍历当前选中列表的所有mesh，根据名称导出到对应的文件夹中
         # 获取当前选中的对象列表
         selected_collection = bpy.context.collection
@@ -351,9 +344,7 @@ class MMTExportAllIBVBModel(bpy.types.Operator):
 
                 ib_path = os.path.splitext(vb_path)[0] + '.ib'
                 fmt_path = os.path.splitext(vb_path)[0] + '.fmt'
-
-                # FIXME: ExportHelper will check for overwriting vb_path, but not ib_path
-
+                
                 export_3dmigoto(self, context, vb_path, ib_path, fmt_path)
         if export_time == 0:
             self.report({'ERROR'}, "导出失败！请选择一个集合后再点一键导出！")

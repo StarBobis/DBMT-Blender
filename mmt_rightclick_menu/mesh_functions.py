@@ -135,8 +135,6 @@ def fill_vertex_group_gaps(self, context):
 
 
 def add_bone_from_vertex_group(self, context):
-    # TODO 这里运行后会报错，暂时用不到，以后有了更好的算法再修复。
-    # 这玩意实际上没啥用，但是好像又有点用，反正鸡肋，加上吧。
     # 获取当前选中的物体
     selected_object = bpy.context.object
 
@@ -176,6 +174,16 @@ def add_bone_from_vertex_group(self, context):
 
     # 切换回对象模式
     bpy.ops.object.mode_set(mode='OBJECT')
+
+   # 选择骨骼并绑定物体到骨骼
+    bpy.context.view_layer.objects.active = armature_object  # 激活骨骼
+    bpy.ops.object.select_all(action='DESELECT')  # 取消选择所有
+    selected_object.select_set(True)  # 选择物体
+    bpy.ops.object.parent_set(type='ARMATURE_AUTO')  # 绑定物体到骨骼
+
+    # 刷新场景
+    bpy.context.view_layer.update()
+
     return {'FINISHED'}
 
 

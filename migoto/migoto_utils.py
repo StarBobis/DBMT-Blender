@@ -3,28 +3,6 @@ import numpy
 import operator  # to get function names for operators like @, +, -
 import struct
 
-# 这里使用type关键字创建了一个类，类名是DummyIOOBJOrientationHelper，(object,)表示继承自object对象，{}表示没定义属性和方法
-IOOBJOrientationHelper = type('DummyIOOBJOrientationHelper', (object,), {})
-
-# Constants
-vertex_color_layer_channels = 4
-
-
-def set_active_object(context, obj):
-    context.view_layer.objects.active = obj  # the 2.8 way
-
-
-def get_active_object(context):
-    return context.view_layer.objects.active
-
-
-def link_object_to_scene(context, obj):
-    context.scene.collection.objects.link(obj)
-
-
-def unlink_object(context, obj):
-    context.scene.collection.objects.unlink(obj)
-
 
 def matmul(a, b):
     return operator.matmul(a, b)  # the same as writing a @ b
@@ -106,7 +84,6 @@ def EncoderDecoder(fmt):
 
 # 这里是用于判断数据与标准数据长度差距的
 components_pattern = re.compile(r'''(?<![0-9])[0-9]+(?![0-9])''')
-
 
 def format_components(fmt):
     return len(components_pattern.findall(fmt))

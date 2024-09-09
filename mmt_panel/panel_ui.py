@@ -112,9 +112,11 @@ class MMTPanel(bpy.types.Panel):
         operator_export_mmd_bone_matrix = layout.operator("mmt.export_mmd_animation_mod", text="Export Animation Mod")
         operator_export_mmd_bone_matrix.output_folder = output_folder_path
 
-        # # 添加分隔符
-        # layout.separator()
-        # TODO 测试基于Buffer的自动导入导出
-        
+        # 添加分隔符
+        layout.separator()
+        layout.label(text="导入导出[新格式]")
+         # 手动导入buf文件
+        operator_import_ib_vb = self.layout.operator("import_mesh.dbmt_buffer", text="导入Buffer模型文件")
+        operator_import_ib_vb.filepath = output_folder_path
 
         

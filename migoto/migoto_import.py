@@ -120,14 +120,16 @@ def import_vertices(mesh, vb: VertexBuffer):
             positions = [(x[0], x[1], x[2]) for x in data]
             mesh.vertices.foreach_set('co', unpack_list(positions))
         elif elem.name.startswith('COLOR'):
-            if len(data[0]) <= 3 or vertex_color_layer_channels == 4:
+            if len(data[0]) <= 3 or 4 == 4:
+                # Nico:实际执行过程中，几乎总会执行这里而不是下面的
+                # 即使是原版的也是设置vertex_color_layer_channels = 4 然后这里or进行比较的，所以总是会执行这里的设计。
+                # 如果是else下面的执行到会百分百报错的。
                 # Either a monochrome/RGB layer, or Blender 2.80 which uses 4
                 # channel layers
                 mesh.vertex_colors.new(name=elem.name)
                 color_layer = mesh.vertex_colors[elem.name].data
-                c = vertex_color_layer_channels
                 for l in mesh.loops:
-                    color_layer[l.index].color = list(data[l.vertex_index]) + [0] * (c - len(data[l.vertex_index]))
+                    color_layer[l.index].color = list(data[l.vertex_index]) + [0] * (4 - len(data[l.vertex_index]))
             else:
                 mesh.vertex_colors.new(name=elem.name + '.RGB')
                 mesh.vertex_colors.new(name=elem.name + '.A')
@@ -136,6 +138,7 @@ def import_vertices(mesh, vb: VertexBuffer):
                 for l in mesh.loops:
                     color_layer[l.index].color = data[l.vertex_index][:3]
                     alpha_layer[l.index].color = [data[l.vertex_index][3], 0, 0]
+
         elif elem.name == 'NORMAL':
             use_normals = True
             normals = [(x[0], x[1], x[2]) for x in data]
@@ -238,8 +241,6 @@ def create_material_with_texture(obj, mesh_name, directory):
                 obj.data.materials.append(material)
 
 
-
-
 def read_vertexbuffer_indexbuffer(operator, paths):
     vb_paths, ib_paths, use_bin = zip(*paths)
     if len(vb_paths) != 1 or len(ib_paths) > 1:
@@ -257,7 +258,6 @@ def read_vertexbuffer_indexbuffer(operator, paths):
     return vb, ib, os.path.basename(vb_bin_path)
 
 
-# TODO 为什么要flip_texcoord_v?
 def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True, axis_forward='-Z', axis_up='Y'):
 
     # 获取vb和ib抽象出的数据，顺便获取最终导入后的名称为 .vb结尾
@@ -303,20 +303,24 @@ def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True,
     else:
         mesh.calc_normals()
 
-    link_object_to_scene(context, obj)
-    obj.select_set(True)
-    set_active_object(context, obj)
+    # 链接对象
+    context.scene.collection.objects.link(obj)
 
-    operator.report({'INFO'}, "导入成功!")
+    obj.select_set(True)
+
+    # 设置当前物体为激活选中状态
+    context.view_layer.objects.active = obj
+
 
     # TODO 这里用到bmesh的部分删了也没事，到底有什么用呢？
-    import bmesh
-    # 创建 BMesh 副本
-    bm = bmesh.new()
-    bm.from_mesh(mesh)
-    # 将 BMesh 更新回原始网格
-    bm.to_mesh(mesh)
-    bm.free()
+    # 对比导出部分来看，可能是想要三角化？但是暂时没遇到问题，就先删掉吧。
+    # import bmesh
+    # # 创建 BMesh 副本
+    # bm = bmesh.new()
+    # bm.from_mesh(mesh)
+    # # 将 BMesh 更新回原始网格
+    # bm.to_mesh(mesh)
+    # bm.free()
 
     # 设置导入时的顶点数和索引数，用于插件右键对比是否和原本顶点数量一致
     obj['3DMigoto:OriginalVertexNumber'] = len(mesh.vertices)
@@ -326,6 +330,11 @@ def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True,
     mesh_prefix: str = str(mesh.name).split(".")[0]
     # operator.report({'INFO'}, mesh_prefix)
     create_material_with_texture(obj, mesh_prefix, os.path.dirname(paths[0][0][0]))
+
+    
+    # 弹出导入成功
+    operator.report({'INFO'}, "导入成功!")
+
     return obj
 
 
