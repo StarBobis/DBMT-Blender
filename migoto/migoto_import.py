@@ -101,23 +101,13 @@ def import_vertices(mesh, vb: VertexBuffer):
             # Ensure positions are 3-dimensional:
             if len(data[0]) == 4:
                 if ([x[3] for x in data] != [1.0] * len(data)):
-                    # XXX: Leaving this fatal error in for now, as the meshes
-                    # it triggers on in DOA6 (skirts) lie about almost every
-                    # semantic and we cannot import them with this version of
-                    # the script regardless. Comment it out if you want to try
-                    # importing anyway and preserving the W coordinate in a
-                    # vertex group. It might also be possible to project this
-                    # back into 3D if we assume the coordinates are homogeneous
-                    # (i.e. divide XYZ by W), but that might be assuming too
-                    # much for a generic script.
                     raise Fatal('Positions are 4D')
-
                     # Nico: Blender暂时不支持4D索引，加了也没用，直接不行就报错，转人工处理。
-                    # Occurs in some meshes in DOA6, such as skirts.
-                    # W coordinate must be preserved in these cases.
-                    # print('Positions are 4D, storing W coordinate in POSITION.w vertex layer')
-                    # vertex_layers['POSITION.w'] = [[x[3]] for x in data]
             positions = [(x[0], x[1], x[2]) for x in data]
+
+            # https://docs.blender.org/api/3.6/bpy_extras.io_utils.html#bpy_extras.io_utils.unpack_list
+            # 只列出了这个函数，文档未给出任何说明
+            # TODO 这里为什么是'co'
             mesh.vertices.foreach_set('co', unpack_list(positions))
         elif elem.name.startswith('COLOR'):
             if len(data[0]) <= 3 or 4 == 4:
@@ -303,15 +293,6 @@ def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True,
     else:
         mesh.calc_normals()
 
-    # 链接对象
-    context.scene.collection.objects.link(obj)
-
-    obj.select_set(True)
-
-    # 设置当前物体为激活选中状态
-    context.view_layer.objects.active = obj
-
-
     # TODO 这里用到bmesh的部分删了也没事，到底有什么用呢？
     # 对比导出部分来看，可能是想要三角化？但是暂时没遇到问题，就先删掉吧。
     # import bmesh
@@ -330,7 +311,6 @@ def import_3dmigoto_vb_ib_to_obj(operator, context, paths, flip_texcoord_v=True,
     mesh_prefix: str = str(mesh.name).split(".")[0]
     # operator.report({'INFO'}, mesh_prefix)
     create_material_with_texture(obj, mesh_prefix, os.path.dirname(paths[0][0][0]))
-
     
     # 弹出导入成功
     operator.report({'INFO'}, "导入成功!")
@@ -412,7 +392,7 @@ class Import3DMigotoRaw(bpy.types.Operator, ImportHelper):
                     obj_results = import_3dmigoto_raw_buffers(self, context, fmt_path, fmt_path, vb_path=vb_path, ib_path=ib_path, **migoto_raw_import_options)
                     for obj in obj_results:
                         # 因为之前导入的过程中链接到scene了，所以必选在这里先断开链接否则会出现两个实例
-                        bpy.context.scene.collection.objects.unlink(obj)
+                        # bpy.context.scene.collection.objects.unlink(obj)
                         # 再链接到集合，就能显示在集合下面了
                         collection.objects.link(obj)
                         
@@ -509,9 +489,6 @@ class MMTImportAllVbModel(bpy.types.Operator):
                         obj_results = import_3dmigoto_raw_buffers(self, context, fmt_path, fmt_path, vb_path=vb_bin_path,
                                                                   ib_path=ib_bin_path, **migoto_raw_import_options)
                         for obj in obj_results:
-                             # 因为之前导入的过程中链接到scene了，所以必选在这里先断开链接否则会出现两个实例
-                            bpy.context.scene.collection.objects.unlink(obj)
-                            # 再链接到集合，就能显示在集合下面了
                             collection.objects.link(obj)
                     else:
                         self.report({'ERROR'}, "Can't find .fmt file!")
