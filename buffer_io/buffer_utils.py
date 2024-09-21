@@ -24,5 +24,9 @@ def read_formated_data(file_path:str,format:str) -> list:
         while chunk := read_file.read(4): 
             nx, ny, nz, nw = struct.unpack('<4b', chunk)
             file_data.append((nx / 127.0, ny / 127.0, nz / 127.0, nw / 127.0))
+    elif format == "R8G8B8A8_UNORM":
+        while chunk := read_file.read(4): 
+            r, g, b, a = struct.unpack('<4B', chunk)
+            file_data.append((r / 255.0, g / 255.0, b / 255.0, a / 255.0))
     read_file.close()
     return file_data

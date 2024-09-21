@@ -6,6 +6,7 @@ from .buffer_utils import *
 import os
 import json
 from enum import Enum
+from array import array
 
 # 导入bpy相关属性
 from bpy.props import StringProperty,CollectionProperty,BoolProperty
@@ -59,19 +60,18 @@ def read_buffer_and_combine_obj(operator,format_json_path:str):
         if "POSITION" == buffer_element_name:
             DATA_POSITION = read_formated_data(buffer_file_path, buffer_format)
         elif "NORMAL" == buffer_element_name:
-            pass
+            DATA_NORMAL = read_formated_data(buffer_file_path, buffer_format)
         elif "TANGENT" == buffer_element_name:
-            pass
+            DATA_TANGENT = read_formated_data(buffer_file_path, buffer_format)
         elif buffer_element_name.startswith("COLOR"):
-            pass
+            DATA_COLOR = read_formated_data(buffer_file_path, buffer_format)
         elif buffer_element_name.startswith("TEXCOORD"):
             pass
         elif buffer_element_name.startswith("BLENDWEIGHT"):
             pass
         elif buffer_element_name.startswith("BLENDINDICES"):
             pass
-        elif buffer_element_name.startswith("Index"):
-            pass
+        
         
     # 开始拼接obj并返回
     obj_result = []
@@ -95,12 +95,40 @@ def read_buffer_and_combine_obj(operator,format_json_path:str):
             faces = [(INDEX_DATA[j], INDEX_DATA[j+1], INDEX_DATA[j+2]) for j in range(0, index_count - 2, 3)]
             mesh.from_pydata(DATA_POSITION, [], faces)
 
-        # TODO 导入其它数据
-
+        # 导入NORMAL数据，这里我们用DarkStarSword的设计，更简单但是4.2版本不支持了，后面再想办法吧。
+        if len(DATA_NORMAL) != 0:
+            normals = [(x[0], x[1], x[2]) for x in DATA_NORMAL]
+            mesh.create_normals_split()
+            for l in mesh.loops:
+                l.normal[:] = normals[l.vertex_index]
+        
+        # TANGENT没必要导入，因为在导出时会重新计算
+        if len(DATA_TANGENT) != 0:
+            operator.report({'INFO'}, "跳过TANGENT导入，因为在导出时会重新计算")
+        
+        # COLOR只能有一个，不存在第二个COLOR问题，WWMI中的COLOR1的设计是错误的，其实是平滑法线存UV
+        if len(DATA_COLOR) != 0:
+            mesh.vertex_colors.new(name="COLOR")
+            color_layer = mesh.vertex_colors["COLOR"].data
+            for l in mesh.loops:
+                color_layer[l.index].color = list(DATA_COLOR[l.vertex_index]) + [0] * (4 - len(DATA_COLOR[l.vertex_index]))
+            
+        # 设置TEXCOORD
+        
 
         # 全部属性设置完成后进行validate
         mesh.validate(verbose=False, clean_customdata=False)  # *Very* important to not remove lnors here!
         mesh.update()
+
+        # 让模型变得光滑，此步骤必须在mesh.validate()之后进行
+        if len(DATA_NORMAL) != 0:
+            # Taken from import_obj/import_fbx
+            clnors = array('f', [0.0] * (len(mesh.loops) * 3))
+            mesh.loops.foreach_get("normal", clnors)
+            mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+            mesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
+        else:
+            mesh.calc_normals()
         
         # 添加到用于返回的集合中
         obj_result.append(obj)

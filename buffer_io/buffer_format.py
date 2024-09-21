@@ -470,7 +470,5 @@ def main():
     
     create_mesh_from_buffers(vertices, indices, texcoords, color0, color1, object_data, blend_weights, blend_indices, normals, tangents, shapekey_offsets, shapekey_vertex_ids, shapekey_vertex_offsets)
 
-# Call the main function
-main()
 
 
