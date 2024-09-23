@@ -130,6 +130,9 @@ def import_vertices(mesh, vb: VertexBuffer):
                     alpha_layer[l.index].color = [data[l.vertex_index][3], 0, 0]
 
         elif elem.name == 'NORMAL':
+
+            # TODO SnB的NORMAl有四个分量，但是它这里只导入了三个，所以导致最终导出的时候丢失了部分信息。
+            # 也有可能SnB本身就是NORMAL和TANGENT的排列？
             use_normals = True
             normals = [(x[0], x[1], x[2]) for x in data]
             mesh.create_normals_split()
