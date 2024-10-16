@@ -1,4 +1,5 @@
-# This mesh_operator.py is only used in right click options.
+# Nico: 此文件定义右键菜单的功能类。
+# 所有操作都要加上bl_options = {'UNDO'}，这样可以支持Ctrl + Z撤销。
 from .mesh_functions import *
 
 
