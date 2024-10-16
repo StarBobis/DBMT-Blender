@@ -118,18 +118,19 @@ class MigotoRightClickMenu(bpy.types.Menu):
     
     def draw(self, context):
         layout = self.layout
-        layout.operator("object.remove_unused_vertex_group")
-        layout.operator("object.merge_vertex_group_with_same_number")
-        layout.operator("object.fill_vertex_group_gaps")
-        layout.operator("object.add_bone_from_vertex_group")
-        layout.operator("object.remove_not_number_vertex_group")
-        layout.operator("object.convert_to_fragment")
-        layout.operator("object.mmt_delete_loose")
-        layout.operator("object.mmt_reset_rotation")
-        layout.operator("object.mmt_cancel_auto_smooth")
-        layout.operator("object.mmt_set_auto_smooth_89")
-        layout.operator("object.mmt_show_indexed_vertices")
-        layout.operator("object.split_mesh_by_common_vertex_group")
+        # layout.operator可以直接用 [类名.bl_idname] 这样就不用再写一次常量了，方便管理
+        layout.operator(RemoveUnusedVertexGroupOperator.bl_idname)
+        layout.operator(MergeVertexGroupsWithSameNumber.bl_idname)
+        layout.operator(FillVertexGroupGaps.bl_idname)
+        layout.operator(AddBoneFromVertexGroup.bl_idname)
+        layout.operator(RemoveNotNumberVertexGroup.bl_idname)
+        layout.operator(ConvertToFragmentOperator.bl_idname)
+        layout.operator(MMTDeleteLoose.bl_idname)
+        layout.operator(MMTResetRotation.bl_idname)
+        layout.operator(MMTCancelAutoSmooth.bl_idname)
+        layout.operator(MMTSetAutoSmooth89.bl_idname)
+        layout.operator(MMTShowIndexedVertices.bl_idname)
+        layout.operator(SplitMeshByCommonVertexGroup.bl_idname)
 
 
 # 定义菜单项的注册函数
