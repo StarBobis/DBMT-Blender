@@ -109,7 +109,7 @@ class SplitMeshByCommonVertexGroup(bpy.types.Operator):
     def execute(self, context):
         return split_mesh_by_common_vertex_group(self, context)
 
-
+ 
 # -----------------------------------这个属于右键菜单注册，单独的函数要往上面放---------------------------------------
 class MigotoRightClickMenu(bpy.types.Menu):
     bl_idname = "VIEW3D_MT_object_3Dmigoto"
